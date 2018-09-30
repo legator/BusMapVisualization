@@ -1,0 +1,185 @@
+<!DOCTYPE&
+<html>
+<head>
+   <title></title>
+   <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBrjeABCsOwW1rhi7eW6_b_fWF8OK2HeiA"></script>
+   <style>
+   html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+   }
+   #map-canvas {
+      height: 100%;
+      width: 100%;
+   }
+   </style>
+   <title>LODA Routes Web API</title>
+   <script language="javascript" type="text/javascript">
+
+      let baseURL = "http://82.207.107.126:13541/tms/loda/api/389C2151-C5E9-4D47-8B94-5F643CA0AFEB/";
+      let urlParams = new URLSearchParams(window.location.search);
+      let route = urlParams.get('route');
+      let routeId;
+      let routes;
+      let stops;
+      let routePath;
+      var waypts = [];
+      var markers = [];
+
+      function GetRouteId() {
+
+        routes = []
+        stops = []
+        routePath = []
+        waypts = [];
+
+        var url = baseURL + "GetRoutes";
+        jQuery.ajax({
+          dataType: "json",
+          url: url,
+          async: false,
+        }).success(function(data) {
+
+          routeId = data.Data.find(function(value, index, array) {
+            if (value.Name.indexOf(route) !== -1)
+              return value;
+          }).Id;
+
+          GetRouteInfo();
+          GetRouteStops();
+          GetRoutePath();
+          routeMap();
+        });
+      };
+
+      function GetRouteInfo() {
+        var url = baseURL + "GetRouteInfo?routeId=" + routeId;
+        jQuery.ajax({
+          dataType: "json",
+          url: url,
+          async: false,
+        }).success(function(data) {
+
+          routes = data.Data;
+        });
+      };
+
+      function GetRouteStops() {
+        var url = baseURL + "GetRouteStops?routeId=" + routeId;
+        jQuery.ajax({
+          dataType: "json",
+          url: url,
+          async: false,
+        }).success(function(data) {
+
+          stops = data.Data;
+        });
+      };
+
+      function GetRoutePath() {
+        var url = baseURL + "GetRoutePath?routeId=" + routeId;
+        jQuery.ajax({
+          dataType: "json",
+          url: url,
+          async: false,
+        }).success(function(data) {
+
+          routePath = data.Data;
+        });
+      };
+
+      function routeMap() {
+
+        var directionsService = new google.maps.DirectionsService;
+        var directionsDisplay = new google.maps.DirectionsRenderer;
+        var map = new google.maps.Map(document.getElementById('map-canvas'), {
+          zoom: 6,
+          center: {
+            lat: 49.840384,
+            lng: 24.023479
+          }
+        });
+        directionsDisplay.setMap(map);
+
+        for (var i = 0; i < stops.length; i++) {
+          waypts.push({
+            location: new google.maps.LatLng(stops[i].Y, stops[i].X),
+            stopover: true
+          });
+          if (i !== stops.length && stops[i].Name === stops[i + 1].Name) {
+            break;
+          }
+        };
+
+        directionsService.route({
+          origin: {
+            lat: stops[0].Y,
+            lng: stops[0].X
+          },
+          destination: waypts[waypts.length - 1].location,
+          waypoints: waypts,
+          optimizeWaypoints: true,
+          travelMode: 'DRIVING'
+        }, function(response, status) {
+          if (status === 'OK') {
+            directionsDisplay.setDirections(response);
+            addBuses();
+          } else {
+            window.alert('Directions request failed due to ' + status);
+          }
+        });
+      }
+
+      function addBuses() {
+        //add bus to map
+        for (var i = 0; i < routes.length; i++) {
+          var busDisplay = new google.maps.DirectionsRenderer;
+          busDisplay.setMap(map);
+          var busMarker = new google.maps.Marker({
+            position: new google.maps.LatLng(routes[i].Y, routes[i].X),
+            map: map
+          });
+
+          directionsService.route({
+            origin: busMarker
+          }, function(response, status) {
+            if (status === 'OK') {
+              busDisplay.setDirections(response);
+            }
+          });
+
+          markers.push(busMarker);
+        }
+
+        if(routes.length!==0){
+            (function() {
+               updateBusMarkers();
+               setTimeout(arguments.callee, 10000);
+            })();
+         }
+      };
+
+      function updateBusMarkers() {
+        GetRouteInfo();
+        for (var i = 0; i < routes.length; i++) {
+          if (i === markers.length) break;
+          latitude = parseInt(routes[i].Y, 10);
+          longtitude = parseInt(routes[i].X, 10);
+          myLatlng = new google.maps.LatLng(latitude, longtitude);
+          marker[i].setPosition(myLatlng);
+          map.setCenter(myLatlng);
+        }
+      };
+
+        $(document).ready(function() {
+          GetRouteId();
+        });
+
+      </script>
+</head>
+<body>
+      <div id="map-canvas"></div>
+</body>
+</html>
